@@ -50,6 +50,7 @@ pub mod tests;
 pub enum Unknown { }
 
 /// Point of prime order.
+#[derive(Debug)]
 pub enum PrimeOrder { }
 
 /// Fixed generators of the Jubjub curve of unknown
@@ -220,6 +221,7 @@ impl JubjubBls12 {
             tag.push(0u8);
 
             loop {
+                // gh Option<edwards::Point<E, PrimeOrder>>
                 let gh = group_hash(
                     &tag,
                     personalization,
@@ -245,30 +247,31 @@ impl JubjubBls12 {
 
                 let mut segment_number = [0u8; 4];
                 (&mut segment_number[0..4]).write_u32::<LittleEndian>(m).unwrap();
+                print!("*segment_number = {:?}\n",segment_number);
+
+                let gh = find_group_hash(
+                    
+                    &segment_number,
+                    constants::PEDERSEN_HASH_GENERATORS_PERSONALIZATION,
+                    &tmp_params
+                );
+
+                print!("*PEDERSEN GENERATOR x {} = {:?}\n",m,gh.x);
+                print!("*PEDERSEN GENERATOR y {} = {:?}\n",m,gh.y);
+                print!("*PEDERSEN GENERATOR t {} = {:?}\n",m,gh.t);
+                print!("*PEDERSEN GENERATOR z {} = {:?}\n",m,gh.z);
+                
+                /// This constants are BLAKE2s Personalization for Pedersen hash generators.
+                // print!("*Constants::PEDERSEN_HASH_GENERATORS_PERSONALIZATION = {:?}\n",constants::PEDERSEN_HASH_GENERATORS_PERSONALIZATION);
 
                 pedersen_hash_generators.push(
-                    find_group_hash(
-                        &segment_number,
-                        constants::PEDERSEN_HASH_GENERATORS_PERSONALIZATION,
-                        &tmp_params
-                    )
+                    gh
                 );
-            }
-
-            // Check for duplicates, far worse than spec inconsistencies!
-            for (i, p1) in pedersen_hash_generators.iter().enumerate() {
-                if p1 == &edwards::Point::zero() {
-                    panic!("Neutral element!");
-                }
-
-                for p2 in pedersen_hash_generators.iter().skip(i+1) {
-                    if p1 == p2 {
-                        panic!("Duplicate generator!");
-                    }
-                }
+                // print!("* pedersen_hash_generators = {:?}\n",pedersen_hash_generators);
             }
 
             tmp_params.pedersen_hash_generators = pedersen_hash_generators;
+            // print!("* pedersen_hash_generators = {:?}\n",tmp_params.pedersen_hash_generators);
         }
 
         // Create the exp table for the Pedersen hash generators
@@ -317,6 +320,8 @@ impl JubjubBls12 {
             fixed_base_generators[FixedGenerators::NoteCommitmentRandomness as usize] =
                 find_group_hash(b"r", constants::PEDERSEN_HASH_GENERATORS_PERSONALIZATION, &tmp_params);
 
+            // print!("* fixed_base_generators = {:?}\n",fixed_base_generators);
+
             fixed_base_generators[FixedGenerators::NullifierPosition as usize] =
                 find_group_hash(&[], constants::NULLIFIER_POSITION_IN_TREE_GENERATOR_PERSONALIZATION, &tmp_params);
 
@@ -328,7 +333,7 @@ impl JubjubBls12 {
 
             fixed_base_generators[FixedGenerators::SpendingKeyGenerator as usize] =
                 find_group_hash(&[], constants::SPENDING_KEY_GENERATOR_PERSONALIZATION, &tmp_params);
-
+            
             // Check for duplicates, far worse than spec inconsistencies!
             for (i, p1) in fixed_base_generators.iter().enumerate() {
                 if p1 == &edwards::Point::zero() {
